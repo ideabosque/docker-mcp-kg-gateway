@@ -6,7 +6,7 @@
 #   CONTAINER_PORT=9000 make health
 # Note: make does NOT read .env — export the variable if you changed it there.
 GATEWAY_CONTAINER_NAME ?= mcp-kg-gateway
-CONTAINER_PORT          ?= 8765
+CONTAINER_PORT          ?= 8766
 
 # Build the Docker image
 build:

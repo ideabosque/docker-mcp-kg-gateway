@@ -47,7 +47,7 @@ installs dependencies — it is **not** persisted in any image layer.
 
 ```
                      ┌───────────────────────────┐
-  client ──HTTPS──▶  │   mcp-kg-gateway (:8765)  │
+  client ──HTTPS──▶  │   mcp-kg-gateway (:8766)  │
                      │  FastAPI + supervisord     │
                      │  silvaengine_gateway        │
                      │   ├─ mcp_daemon_engine      │
@@ -151,7 +151,7 @@ See `.env.example` for the full annotated list. Highlights:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CONTAINER_PORT` / `GATEWAY_PORT` | `8765` | Host port / in-container bind port |
+| `CONTAINER_PORT` / `GATEWAY_PORT` | `8766` / `8765` | Host port / in-container bind port |
 | `GATEWAY_ROUTES_HOST_FILE` | `./routes.yaml` | Host file mounted over `/app/routes.yaml` |
 | `JWT_SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD` | — | Local auth provider credentials |
 | `PG_HOST`, `PG_USER`, `PG_PASSWORD`, `PG_DB` | `postgres` / `silvaengine` / `silvaengine` / `silvaengine` | PostgreSQL connection |
