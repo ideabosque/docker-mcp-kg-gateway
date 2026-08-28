@@ -87,6 +87,14 @@ default. `NEO4J_AUTH` must match `neo4j_username`/`neo4j_password`;
 `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` must match
 `PG_USER`/`PG_PASSWORD`/`PG_DB`.
 
+The default **host-side** ports (`POSTGRES_PORT=5433`, `NEO4J_BROWSER_PORT=7475`,
+`NEO4J_BOLT_PORT=7688`) are deliberately non-standard: `../docker-silvaengine-gateway`
+bundles Postgres/Neo4j on the standard 5432/7474/7687, and both stacks are
+meant to be able to run at the same time without a port collision. These only
+affect host access (`localhost:5433`, etc.) — `PG_PORT`/`neo4j_uri` (used
+inside the docker network to reach the bundled `postgres`/`neo4j` services)
+stay on the databases' normal 5432/7687.
+
 `knowledge_graph_engine` uses a configurable PostgreSQL table prefix
 (`KGE_PG_TABLE_PREFIX`, default `kge_`) so it can safely share a database with
 other SilvaEngine modules; `mcp_daemon_engine` uses its own literal table
