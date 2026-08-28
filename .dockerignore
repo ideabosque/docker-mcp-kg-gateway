@@ -1,0 +1,18 @@
+.git
+.gitignore
+.vscode
+README.md
+LICENSE
+Makefile
+docker-compose.yml
+pyproject.toml
+logs/*
+data/*
+postgres_data/*
+postgres_logs/*
+neo4j_data/*
+*.bak
+__pycache__/
+*.pyc
+# NOTE: requirements.txt, requirements-modules.txt, routes.yaml and
+# supervisord.conf are intentionally NOT ignored — the build needs them.

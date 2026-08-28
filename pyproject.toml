@@ -1,0 +1,20 @@
+[project]
+name            = "docker-mcp-kg-gateway"
+version         = "0.0.1"
+description     = "Container image for the SilvaEngine Gateway exposing MCP Daemon Engine and Knowledge Graph Engine, backed by PostgreSQL and Neo4j"
+authors         = [{ name = "Idea Bosque", email = "ideabosque@gmail.com" }]
+requires-python = ">=3.10"
+# Runtime dependencies are pinned in requirements.txt (git-sourced modules).
+dependencies    = []
+
+[build-system]
+requires      = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length    = 88
+target-version = "py312"
+
+[tool.black]
+line-length    = 88
+target-version = ["py312"]

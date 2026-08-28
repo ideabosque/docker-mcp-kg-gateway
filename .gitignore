@@ -1,0 +1,14 @@
+.env
+.env.local
+logs/*
+data/*
+postgres_data/*
+postgres_logs/*
+neo4j_data/*
+!logs/.gitkeep
+!data/.gitkeep
+*.bak
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/

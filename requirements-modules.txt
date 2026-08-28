@@ -1,0 +1,17 @@
+# =============================================================================
+# Modules installed --no-deps (see Dockerfile)
+# =============================================================================
+# silvaengine_gateway, mcp_daemon_engine and knowledge_graph_engine are
+# installed WITHOUT dependency resolution: silvaengine_gateway's metadata
+# declares engine modules by bare name (knowledge_graph_engine,
+# mcp-daemon-engine, rfq_engine, ai_coordination_engine) that are NOT on PyPI
+# and are intentionally absent from this MCP+KGE-only image. Their real
+# third-party deps + the shared SilvaEngine libraries are provided by
+# requirements.txt.
+#
+# Over HTTPS (no SSH key required). For PRIVATE repos, pass a GitHub token at
+# build time (see Dockerfile / README):
+#   docker build --secret id=github_token,env=GITHUB_TOKEN .
+git+https://github.com/ideabosque/mcp_daemon_engine.git@main#egg=mcp_daemon_engine
+git+https://github.com/ideabosque/knowledge_graph_engine.git@main#egg=knowledge_graph_engine
+git+https://github.com/ideabosque/silvaengine_gateway.git@main#egg=silvaengine_gateway

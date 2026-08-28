@@ -1,0 +1,146 @@
+# =============================================================================
+# docker-mcp-kg-gateway
+# =============================================================================
+# A SilvaEngine Gateway image exposing ONLY the MCP Daemon Engine (MCP
+# JSON-RPC over REST/SSE) and the Knowledge Graph Engine (GraphQL + async
+# extraction), backed by PostgreSQL (metadata) and Neo4j (graph store).
+#
+# Three services:
+#   - mcp-kg-gateway (always on)  — the SilvaEngine Gateway, MCP+KGE routes.
+#   - postgres        (optional)   — PostgreSQL metadata backend. Enabled via
+#                                    COMPOSE_PROFILES=postgres.
+#   - neo4j            (optional)  — Neo4j graph store for KGE. Enabled via
+#                                    COMPOSE_PROFILES=neo4j.
+#
+# When a profile is off, point the corresponding *_HOST / *_URI env var at an
+# external instance instead (e.g. PG_HOST=host.docker.internal,
+# neo4j_uri=bolt://host.docker.internal:7687).
+# =============================================================================
+
+services:
+  # ── MCP + KGE Gateway (always on) ─────────────────────────────────────────
+  mcp-kg-gateway:
+    build: .
+    container_name: ${GATEWAY_CONTAINER_NAME:-mcp-kg-gateway}
+    env_file:
+      - .env
+    ports:
+      # host:container — container bind port is GATEWAY_PORT
+      - "${CONTAINER_PORT:-8765}:${GATEWAY_PORT:-8765}"
+    volumes:
+      - ./logs:/var/log/supervisor
+      - ./data:/app/data
+      # Mount the MCP+KGE-only routes.yaml over the one baked into the image.
+      # The gateway finds it via GATEWAY_ROUTES_CONFIG_PATH=/app/routes.yaml
+      # (set in the Dockerfile). Edit ./routes.yaml on the host + restart — no
+      # rebuild. To use a different manifest, change GATEWAY_ROUTES_HOST_FILE
+      # below.
+      - ${GATEWAY_ROUTES_HOST_FILE:-./routes.yaml}:/app/routes.yaml:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      # PostgreSQL connection defaults for both engines. db_backend is forced
+      # to "postgresql" in the Dockerfile (no DynamoDB option). These default
+      # to the bundled 'postgres' service; .env overrides any of them (e.g.
+      # PG_HOST=host.docker.internal for an external Postgres).
+      - PG_HOST=${PG_HOST:-postgres}
+      - PG_PORT=${PG_PORT:-5432}
+      - PG_USER=${PG_USER:-silvaengine}
+      - PG_PASSWORD=${PG_PASSWORD:-silvaengine}
+      - PG_DB=${PG_DB:-silvaengine}
+      - initialize_tables=${initialize_tables:-1}
+      # Neo4j connection defaults for knowledge_graph_engine. Defaults to the
+      # bundled 'neo4j' service; .env overrides for an external Neo4j.
+      - neo4j_uri=${neo4j_uri:-bolt://neo4j:7687}
+      - neo4j_username=${neo4j_username:-neo4j}
+      - neo4j_password=${neo4j_password:-12345abc}
+      - neo4j_database=${neo4j_database:-neo4j}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+      neo4j:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      # /health is public (no auth) — see silvaengine_gateway routes.
+      test: ["CMD", "curl", "-f", "http://localhost:${GATEWAY_PORT:-8765}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+
+  # ── Optional bundled PostgreSQL (enable with COMPOSE_PROFILES=postgres) ───
+  # PostgreSQL is the metadata backend for mcp_daemon_engine and
+  # knowledge_graph_engine (db_backend=postgresql is forced in the image — no
+  # DynamoDB option). This service is OPTIONAL: enable it with
+  # COMPOSE_PROFILES=postgres and keep PG_HOST=postgres; or leave the profile
+  # off and point PG_* at an external PostgreSQL in .env. Tables are
+  # auto-created on gateway startup when initialize_tables=1.
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
+    container_name: ${POSTGRES_CONTAINER_NAME:-mcp-kg-postgres}
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-silvaengine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-silvaengine}
+      POSTGRES_DB: ${POSTGRES_DB:-silvaengine}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ${POSTGRES_DATA_PATH:-./postgres_data}:/var/lib/postgresql/data
+      - ${POSTGRES_LOG_PATH:-./postgres_logs}:/var/log/postgresql
+    command:
+      - "postgres"
+      - "-c"
+      - "logging_collector=on"
+      - "-c"
+      - "log_directory=/var/log/postgresql"
+      - "-c"
+      - "log_filename=postgresql-%Y-%m-%d.log"
+      - "-c"
+      - "log_statement=${LOG_STATEMENT:-none}"
+      - "-c"
+      - "log_min_duration_statement=${LOG_MIN_DURATION:-1000}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-silvaengine} -d ${POSTGRES_DB:-silvaengine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Optional bundled Neo4j (enable with COMPOSE_PROFILES=neo4j) ───────────
+  # Neo4j is the graph store for knowledge_graph_engine (always required,
+  # regardless of the metadata db_backend). This service is OPTIONAL: enable
+  # it with COMPOSE_PROFILES=neo4j and keep neo4j_uri=bolt://neo4j:7687; or
+  # leave the profile off and point neo4j_uri at an external instance in .env.
+  # NEO4J_AUTH must match neo4j_username/neo4j_password.
+  neo4j:
+    image: neo4j:${NEO4J_VERSION:-5-community}
+    container_name: ${NEO4J_CONTAINER_NAME:-mcp-kg-neo4j}
+    profiles: ["neo4j"]
+    environment:
+      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/12345abc}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "${NEO4J_BROWSER_PORT:-7474}:7474"   # HTTP browser
+      - "${NEO4J_BOLT_PORT:-7687}:7687"      # Bolt
+    volumes:
+      - ${NEO4J_HOST_DIR:-./neo4j_data}/data:/data
+      - ${NEO4J_HOST_DIR:-./neo4j_data}/logs:/logs
+      - ${NEO4J_HOST_DIR:-./neo4j_data}/import:/import
+      - ${NEO4J_HOST_DIR:-./neo4j_data}/plugins:/plugins
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+# A single default bridge network lets the gateway reach the `postgres` and
+# `neo4j` services by name when their profiles are active.
