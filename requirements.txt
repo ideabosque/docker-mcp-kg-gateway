@@ -54,6 +54,11 @@ bcrypt>=4.0.1
 passlib[bcrypt]>=1.7.4
 aiohttp
 git+ssh://git@github.com/ideabosque/mcp_http_client.git@main#egg=mcp_http_client
+# MCP tool packages are extracted to /app/data/functs and imported at
+# runtime, so their third-party imports must be present in the venv.
+# mcp_hospirfq_processor imports `humps` -> pyhumps. Add more here as
+# other deployed tool packages need them.
+pyhumps>=3.8
 
 # ── PostgreSQL driver (metadata backend for both engines) ────────────────────
 # Both mcp_daemon_engine and knowledge_graph_engine call
