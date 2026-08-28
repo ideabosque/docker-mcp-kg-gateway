@@ -10,9 +10,10 @@
 # silvaengine_gateway, mcp_daemon_engine and knowledge_graph_engine are
 # installed --no-deps in the Dockerfile (their metadata lists engines / bare
 # names not on PyPI); this file provides their real third-party deps and the
-# shared SilvaEngine libs. Private ideabosque repos are fetched over git+https
-# (pass a GitHub token at build time — see Dockerfile / README). Keep this
-# file in sync with each engine's pyproject `dependencies` when they change.
+# shared SilvaEngine libs. Private ideabosque repos are fetched over git+ssh
+# (drop a deploy key into ./.ssh before building — see Dockerfile / README).
+# Keep this file in sync with each engine's pyproject `dependencies` when
+# they change.
 # =============================================================================
 
 # ── FastAPI stack (gateway serving deps) ─────────────────────────────────────
@@ -23,15 +24,13 @@ pydantic>=2.0
 pyyaml>=6.0
 boto3>=1.28.0
 
-# ── Shared SilvaEngine libraries (git, over HTTPS) ─────────────────────────
+# ── Shared SilvaEngine libraries (git, over SSH) ───────────────────────────
 # silvaengine_constants MUST come first: silvaengine_utility imports it at
 # module load (graphql.py / http.py) but does NOT declare it as a dependency.
-# For PRIVATE repos, provide a GitHub token at build time (see Dockerfile /
-# README):   docker build --secret id=github_token,env=GITHUB_TOKEN .
-git+https://github.com/ideabosque/silvaengine_constants.git@main#egg=silvaengine_constants
-git+https://github.com/ideabosque/silvaengine_utility.git@main#egg=silvaengine_utility
-git+https://github.com/ideabosque/silvaengine_dynamodb_base.git@main#egg=silvaengine_dynamodb_base
-git+https://github.com/ideabosque/silvaengine_definitions.git@main#egg=silvaengine_definitions
+git+ssh://git@github.com/ideabosque/silvaengine_constants.git@main#egg=silvaengine_constants
+git+ssh://git@github.com/ideabosque/silvaengine_utility.git@main#egg=silvaengine_utility
+git+ssh://git@github.com/ideabosque/silvaengine_dynamodb_base.git@main#egg=silvaengine_dynamodb_base
+git+ssh://git@github.com/ideabosque/silvaengine_definitions.git@main#egg=silvaengine_definitions
 
 # ── Knowledge Graph Engine deps ──────────────────────────────────────────────
 graphene>=3.3,<4
@@ -54,7 +53,7 @@ httpx[http2]>=0.25.0
 bcrypt>=4.0.1
 passlib[bcrypt]>=1.7.4
 aiohttp
-git+https://github.com/ideabosque/mcp_http_client.git@main#egg=mcp_http_client
+git+ssh://git@github.com/ideabosque/mcp_http_client.git@main#egg=mcp_http_client
 
 # ── PostgreSQL driver (metadata backend for both engines) ────────────────────
 # Both mcp_daemon_engine and knowledge_graph_engine call
@@ -69,4 +68,4 @@ alembic>=1.10
 # ── The gateway + engines ─────────────────────────────────────────────────────
 # silvaengine_gateway, mcp_daemon_engine and knowledge_graph_engine are
 # installed separately in the Dockerfile with --no-deps. See Dockerfile /
-# requirements-modules.txt for the git+https install lines.
+# requirements-modules.txt for the git+ssh install lines.

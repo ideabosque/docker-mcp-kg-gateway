@@ -18,7 +18,12 @@ or point at external instances — see [Databases](#databases) below.
 Modeled on [`../docker-a2a-openclaw-gateway`](../docker-a2a-openclaw-gateway):
 the engine packages are `pip install`-ed from git straight into the image (no
 host source mount), so the container is fully self-contained and reproducible
-from a `git clone` + `docker compose up`.
+from a `git clone` + `docker compose build`. All three (`silvaengine_gateway`,
+`mcp_daemon_engine`, `knowledge_graph_engine`) plus `mcp_http_client` and the
+shared SilvaEngine libraries are **private** ideabosque repos, so the build
+clones them over SSH (see [Private repos over SSH](#private-repos-over-ssh)
+below, required before the first build) — mirrors
+[`../docker-silvaengine-gateway`](../docker-silvaengine-gateway)'s approach.
 
 ## Quick start
 
@@ -27,21 +32,34 @@ cp .env.example .env
 # Edit .env: set JWT_SECRET_KEY, ADMIN_PASSWORD, POSTGRES_PASSWORD /
 # PG_PASSWORD, NEO4J_AUTH / neo4j_password, and openai_api_key (KGE extraction
 # uses an LLM). Defaults bring up bundled Postgres + Neo4j.
+# Set up ./.ssh first — see "Private repos over SSH" below.
 docker compose up --build -d
 make health
 ```
 
-For **private** ideabosque repos, pass a GitHub Personal Access Token at build
-time so `git+https` can clone them:
+## Private repos over SSH
 
-```bash
-docker build --secret id=github_token,env=GITHUB_TOKEN -t docker-mcp-kg-gateway .
-# or, with compose (Compose v2.5+):
-GITHUB_TOKEN=ghp_xxx docker compose build --build-arg BUILDKIT_INLINE_CACHE=1
-```
+The Dockerfile clones `silvaengine_gateway`, `mcp_daemon_engine`,
+`knowledge_graph_engine`, `mcp_http_client`, and the shared
+`silvaengine_*` libraries over `git+ssh://git@github.com/...`. Before the
+first `docker compose build`:
 
-The token is wired into git's credential helper only for the `RUN` step that
-installs dependencies — it is **not** persisted in any image layer.
+1. Drop a deploy key with read access to those repos into `./.ssh/` (e.g.
+   `./.ssh/id_rsa` + `./.ssh/id_rsa.pub`). If it's your only key there,
+   nothing else is needed — ssh finds it automatically.
+2. If you need a specific (non-default-named) key, or your own `~/.ssh`
+   already has a conflicting `github.com` entry, copy
+   `.ssh/config.example` to `.ssh/config` and point `IdentityFile` at your
+   key's filename.
+3. `docker compose build` (or `docker build .`) — the Dockerfile copies
+   `./.ssh` into the image, `chmod`s it, and runs `ssh-keyscan github.com`
+   to trust the host before cloning.
+
+`.ssh/` is gitignored except `.gitkeep` and `config.example` — never commit
+a real private key. The key material ends up baked into the built image (not
+just the build cache), matching `../docker-silvaengine-gateway`'s tradeoff:
+treat the image itself as something with SSH access to those repos (don't
+push it to a public registry).
 
 ## Architecture
 
@@ -178,9 +196,27 @@ Dockerfile): `db_backend=postgresql`, `GATEWAY_ROUTES_CONFIG_PATH=/app/routes.ya
 
 ## Adding more engine modules later
 
-To register another engine module (RFQ, A2A, AI agent core, ...) on this same
-gateway: add its git+https line to `requirements-modules.txt` (installed
-`--no-deps`), add its third-party deps to `requirements.txt`, and add a
-`modules:` entry (with its own `routes:` block) to `routes.yaml`. See
-`silvaengine_gateway`'s own packaged `routes.yaml` /
-`module_routes/*.yaml` for reference fragments per engine.
+Two independent steps — routing registration, and making the module's code
+importable — and only the second ever needs a rebuild.
+
+**1. Register its routes** — drop a `*.yaml` file into `./addons/` (see
+`addons/README.md`) with a module map (name, package, `routes:`, etc. — same
+shape as `addons/knowledge_graph_engine.yaml` / `addons/mcp_daemon_engine.yaml`,
+this image's own core modules, registered the identical drop-in way). At
+container startup this gets merged into `routes.yaml`'s permanent
+`!include data/_addons_generated.yaml` line, so `routes.yaml` itself never
+needs editing. A module that fails to import is logged and skipped, not
+fatal — other modules keep working regardless. Restart the container
+(`make restart`) — no rebuild.
+
+**2. Make the module importable** — either:
+- **Baked in** (production): add its git+ssh line to
+  `requirements-modules.txt` (installed `--no-deps`) and its third-party deps
+  to `requirements.txt`, then `docker compose build`; or
+- **Local source, no rebuild** (dev): point `PYTHONPATH` in `.env` at its repo
+  root under `/app/src` (see the "Local source overrides" section in
+  `.env.example`) — its own third-party deps still need a one-time addition
+  to `requirements.txt` + rebuild.
+
+See `silvaengine_gateway`'s own packaged `routes.yaml` / `module_routes/*.yaml`
+for reference fragments per engine (RFQ, A2A, AI agent core, ...).

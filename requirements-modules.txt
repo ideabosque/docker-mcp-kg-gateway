@@ -9,9 +9,8 @@
 # third-party deps + the shared SilvaEngine libraries are provided by
 # requirements.txt.
 #
-# Over HTTPS (no SSH key required). For PRIVATE repos, pass a GitHub token at
-# build time (see Dockerfile / README):
-#   docker build --secret id=github_token,env=GITHUB_TOKEN .
-git+https://github.com/ideabosque/mcp_daemon_engine.git@main#egg=mcp_daemon_engine
-git+https://github.com/ideabosque/knowledge_graph_engine.git@main#egg=knowledge_graph_engine
-git+https://github.com/ideabosque/silvaengine_gateway.git@main#egg=silvaengine_gateway
+# Over SSH — these are PRIVATE ideabosque repos. Drop a deploy key into
+# ./.ssh before building (see Dockerfile / README "Private repos over SSH").
+git+ssh://git@github.com/ideabosque/mcp_daemon_engine.git@main#egg=mcp_daemon_engine
+git+ssh://git@github.com/ideabosque/knowledge_graph_engine.git@main#egg=knowledge_graph_engine
+git+ssh://git@github.com/ideabosque/silvaengine_gateway.git@main#egg=silvaengine_gateway

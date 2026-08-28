@@ -1,13 +1,16 @@
 # =============================================================================
-# SilvaEngine Gateway — Route Manifest (MCP Daemon + Knowledge Graph only)
+# SilvaEngine Gateway — Route Manifest
 # =============================================================================
-# This image exposes ONLY mcp_daemon_engine and knowledge_graph_engine. No
-# RFQ / A2A / AI-agent modules are registered, so their deps are not required.
+# This file is intentionally just a loader: every module — including the
+# two this image ships with (knowledge_graph_engine, mcp_daemon_engine) — is
+# a drop-in file under ./addons/, merged into the single !include below at
+# container startup. See addons/README.md. This file itself should not need
+# to change when modules are added, removed, or edited.
 #
-# This manifest is self-contained (no !include children) and is baked into
-# the image at /app/routes.yaml. The gateway loads it via
-# GATEWAY_ROUTES_CONFIG_PATH=/app/routes.yaml (set in the Dockerfile).
-# Override at runtime by mounting your own routes.yaml and setting the path.
+# This manifest is baked into the image at /app/routes.yaml. The gateway
+# loads it via GATEWAY_ROUTES_CONFIG_PATH=/app/routes.yaml (set in the
+# Dockerfile). Override at runtime by mounting your own routes.yaml and
+# setting the path.
 #
 # handler_type: graphql | rest | sse | background | task_status | websocket
 # Paths carry only {endpoint_id}; the tenant partition id is supplied by the
@@ -15,123 +18,9 @@
 # =============================================================================
 
 modules:
-  # ── Knowledge Graph Engine ────────────────────────────────────────────────
-  - name: knowledge_graph_engine
-    package: knowledge_graph_engine
-    invoker_class_name: KnowledgeGraphEngine
-    transport: graphql
-    config_class: "knowledge_graph_engine.handlers.config:Config"
-    config_init_style: dict
-    config_overrides:
-      pg_table_prefix: "{setting:kge_pg_table_prefix}"
-    routes:
-      # GraphQL — documents, graph schemas, Neo4j instances, requests
-      - path: "/{endpoint_id}/knowledge_graph_graphql"
-        handler_type: graphql
-        dispatch: "knowledge_graph_engine.main:dispatch_graphql"
-        methods: ["POST"]
-        auth: true
-
-      # Background — async document extraction (entity/relationship extraction)
-      - path: "/{endpoint_id}/extract"
-        handler_type: background
-        dispatch: "knowledge_graph_engine.main:dispatch_extract"
-        methods: ["POST"]
-        auth: true
-
-      # Task status — poll an extraction job
-      - path: "/{endpoint_id}/extract/status/{task_id}"
-        handler_type: task_status
-        methods: ["GET"]
-        auth: true
-
-  # ── MCP Daemon Engine ────────────────────────────────────────────────────
-  - name: mcp_daemon_engine
-    package: mcp_daemon_engine
-    invoker_class_name: MCPDaemonEngine
-    transport: hybrid
-    config_class: "mcp_daemon_engine.handlers.config:Config"
-    config_init_style: dict
-    config_exclude_keys:
-      - host
-      - workers
-      - routes_config_path
-      - task_backend
-      - task_table
-      - task_ttl
-      - rate_limit_backend
-      - rate_limit_table
-    on_shutdown: "mcp_daemon_engine.handlers.sse_manager:cleanup_sse"
-    sse_manager: "mcp_daemon_engine.handlers.sse_manager:sse_manager"
-    exception_handlers:
-      - exception_class: "mcp_daemon_engine.utils.exceptions:AuthenticationError"
-        status_code: 401
-      - exception_class: "mcp_daemon_engine.utils.exceptions:TokenExpiredError"
-        status_code: 401
-      - exception_class: "mcp_daemon_engine.utils.exceptions:InvalidRequestError"
-        status_code: 400
-      - exception_class: "mcp_daemon_engine.utils.exceptions:RateLimitExceeded"
-        status_code: 429
-      - exception_class: "mcp_daemon_engine.utils.exceptions:MCPDaemonError"
-        status_code: 500
-    routes:
-      # GraphQL — MCP daemon queries/mutations (functions, modules, settings)
-      - path: "/{endpoint_id}/mcp_daemon_graphql"
-        handler_type: graphql
-        dispatch: "mcp_daemon_engine.main:dispatch_graphql"
-        methods: ["POST"]
-        auth: true
-
-      # REST — MCP JSON-RPC (no SSE broadcast)
-      - path: "/{endpoint_id}/mcp"
-        handler_type: rest
-        dispatch: "mcp_daemon_engine.main:dispatch_mcp"
-        methods: ["POST"]
-        auth: true
-
-      # SSE stream (GET) — long-lived SSE connection
-      - path: "/{endpoint_id}/sse"
-        handler_type: sse
-        methods: ["GET"]
-        auth: true
-
-      # SSE POST — JSON-RPC message + SSE push to connected clients
-      - path: "/{endpoint_id}/sse"
-        handler_type: rest
-        dispatch: "mcp_daemon_engine.main:dispatch_sse_message"
-        methods: ["POST"]
-        auth: true
-
-      # Background — async tool execution
-      - path: "/{endpoint_id}/mcp_async_execute"
-        handler_type: background
-        dispatch: "mcp_daemon_engine.main:dispatch_mcp_async"
-        methods: ["POST"]
-        auth: true
-
-      # Task status
-      - path: "/{endpoint_id}/mcp_async/status/{task_id}"
-        handler_type: task_status
-        methods: ["GET"]
-        auth: true
-
-      # Admin — cache refresh
-      - path: "/{endpoint_id}/admin/cache/refresh"
-        handler_type: rest
-        dispatch: "mcp_daemon_engine.main:dispatch_cache_refresh"
-        methods: ["POST"]
-        auth: true
-
-      # Admin — cache clear (specific partition)
-      - path: "/{endpoint_id}/admin/cache"
-        handler_type: rest
-        dispatch: "mcp_daemon_engine.main:dispatch_cache_clear"
-        methods: ["DELETE"]
-        auth: true
-
-      # Endpoint info
-      - path: "/{endpoint_id}/mcp_info"
-        handler_type: rest
-        dispatch: "mcp_daemon_engine.main:dispatch_mcp_info"
-        methods: ["GET"]
-        auth: true
+  # ── Modules (drop-in, see ./addons/) ───────────────────────────────────────
+  # Auto-generated at container startup by scripts/merge_addon_routes.py from
+  # every *.yaml/*.yml file in ./addons/ — currently knowledge_graph_engine
+  # and mcp_daemon_engine (this image's core modules), plus whatever else you
+  # drop in. This line never needs editing to add/remove/change a module.
+  - !include data/_addons_generated.yaml

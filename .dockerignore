@@ -14,5 +14,8 @@ neo4j_data/*
 *.bak
 __pycache__/
 *.pyc
-# NOTE: requirements.txt, requirements-modules.txt, routes.yaml and
-# supervisord.conf are intentionally NOT ignored — the build needs them.
+# NOTE: .ssh, requirements.txt, requirements-modules.txt, routes.yaml,
+# supervisord.conf, docker-entrypoint.sh and scripts/ are intentionally NOT
+# ignored — the build needs them. addons/ is NOT copied into the image (it's
+# bind-mounted at runtime, see docker-compose.yml) but isn't excluded here
+# either — harmless in the build context either way.

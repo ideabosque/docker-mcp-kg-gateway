@@ -36,8 +36,24 @@ services:
       # rebuild. To use a different manifest, change GATEWAY_ROUTES_HOST_FILE
       # below.
       - ${GATEWAY_ROUTES_HOST_FILE:-./routes.yaml}:/app/routes.yaml:ro
+      # Drop-in addon modules (see ./addons/README.md). routes.yaml's single
+      # `!include data/_addons_generated.yaml` line pulls in whatever the
+      # entrypoint merges from here at container start — add/edit/remove
+      # files under ./addons/ + restart, routes.yaml never needs to change.
+      - ${ADDONS_HOST_DIR:-./addons}:/app/addons:ro
+      # Optional local-source overlay (mirrors ../docker-silvaengine-gateway).
+      # Read-only mount of the silvaengine source tree; harmless by default
+      # (PYTHONPATH below is empty, so nothing under it is imported). Set
+      # PYTHONPATH in .env to a colon-separated list of repo roots under
+      # /app/src to make Python resolve those packages from local source
+      # instead of the versions pip-installed into the image — e.g. to
+      # iterate on mcp_daemon_engine/knowledge_graph_engine without a
+      # git push + rebuild, or to add a new engine module the image doesn't
+      # bake in at all. Edit the source + restart the container, no rebuild.
+      - ${SILVAENGINE_SRC:-../silvaengine}:/app/src:ro
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=${PYTHONPATH:-}
       # PostgreSQL connection defaults for both engines. db_backend is forced
       # to "postgresql" in the Dockerfile (no DynamoDB option). These default
       # to the bundled 'postgres' service; .env overrides any of them (e.g.
@@ -69,7 +85,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
 
   # ── Optional bundled PostgreSQL (enable with COMPOSE_PROFILES=postgres) ───
   # PostgreSQL is the metadata backend for mcp_daemon_engine and

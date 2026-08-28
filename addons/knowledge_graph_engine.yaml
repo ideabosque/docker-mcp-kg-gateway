@@ -1,0 +1,33 @@
+# Knowledge Graph Engine — GraphQL CRUD (documents, graph schemas, Neo4j
+# instances, requests) and async document extraction. One of this gateway's
+# two originally-baked-in modules, moved here for consistency now that all
+# modules (core or addon) follow the same drop-in pattern — see README.md.
+
+name: knowledge_graph_engine
+package: knowledge_graph_engine
+invoker_class_name: KnowledgeGraphEngine
+transport: graphql
+config_class: "knowledge_graph_engine.handlers.config:Config"
+config_init_style: dict
+config_overrides:
+  pg_table_prefix: "{setting:kge_pg_table_prefix}"
+routes:
+  # GraphQL — documents, graph schemas, Neo4j instances, requests
+  - path: "/{endpoint_id}/knowledge_graph_graphql"
+    handler_type: graphql
+    dispatch: "knowledge_graph_engine.main:dispatch_graphql"
+    methods: ["POST"]
+    auth: true
+
+  # Background — async document extraction (entity/relationship extraction)
+  - path: "/{endpoint_id}/extract"
+    handler_type: background
+    dispatch: "knowledge_graph_engine.main:dispatch_extract"
+    methods: ["POST"]
+    auth: true
+
+  # Task status — poll an extraction job
+  - path: "/{endpoint_id}/extract/status/{task_id}"
+    handler_type: task_status
+    methods: ["GET"]
+    auth: true
