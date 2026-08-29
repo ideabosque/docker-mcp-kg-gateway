@@ -141,6 +141,11 @@ services:
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
+      # Community edition's auto-sized default heap is too small for
+      # anything beyond trivial graphs (e.g. a bulk APOC cypher import of a
+      # few thousand nodes with vector embeddings can OOM at the default).
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INITIAL:-1G}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-2G}
     ports:
       - "${NEO4J_BROWSER_PORT:-7474}:7474"   # HTTP browser
       - "${NEO4J_BOLT_PORT:-7687}:7687"      # Bolt
