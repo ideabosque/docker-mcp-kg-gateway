@@ -36,10 +36,19 @@ RUN apt-get update && apt-get install -y \
 
 # SSH setup — the gateway pulls private ideabosque repos over git+ssh.
 # Drop a deploy key into ./.ssh before building (see README).
+# The key is provisioned for BOTH root (build-time pip installs) and the
+# runtime `gateway` user — mcp_git.py spawns git/pip as `gateway`, which
+# would otherwise fail with "Permission denied (publickey)".
 ADD .ssh /root/.ssh
 RUN chmod 700 /root/.ssh && \
     (chmod 600 /root/.ssh/* 2>/dev/null || true) && \
-    ssh-keyscan github.com >> /root/.ssh/known_hosts
+    ssh-keyscan github.com >> /root/.ssh/known_hosts && \
+    mkdir -p /home/gateway/.ssh && \
+    cp /root/.ssh/id_* /home/gateway/.ssh/ 2>/dev/null || true && \
+    cp /root/.ssh/known_hosts /home/gateway/.ssh/known_hosts && \
+    (cp /root/.ssh/config /home/gateway/.ssh/config 2>/dev/null || true) && \
+    chmod 700 /home/gateway/.ssh && \
+    (chmod 600 /home/gateway/.ssh/* 2>/dev/null || true)
 
 ENV PATH="/root/.local/bin:$PATH"
 
@@ -95,7 +104,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 # ── Non-root user ────────────────────────────────────────────────────────────
 RUN useradd -m -u 1000 gateway && \
     mkdir -p /app/data && \
-    chown -R gateway:gateway /app
+    chown -R gateway:gateway /app /home/gateway/.ssh
 
 EXPOSE 8000
 
